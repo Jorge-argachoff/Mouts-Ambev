@@ -1,77 +1,81 @@
 # Developer Evaluation Project
 
-`READ CAREFULLY`
+## Como Começar
 
-## Use Case
-**You are a developer on the DeveloperStore team. Now we need to implement the API prototypes.**
+Siga estes passos para configurar os bancos de dados e executar a API localmente.
 
-As we work with `DDD`, to reference entities from other domains, we use the `External Identities` pattern with denormalization of entity descriptions.
+### Pré-requisitos
 
-Therefore, you will write an API (complete CRUD) that handles sales records. The API needs to be able to inform:
+* [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+* [Docker](https://www.docker.com/) e Docker Compose
+* A ferramenta global `dotnet-ef`, usada para aplicar as migrations do banco de dados:
 
-* Sale number
-* Date when the sale was made
-* Customer
-* Total sale amount
-* Branch where the sale was made
-* Products
-* Quantities
-* Unit prices
-* Discounts
-* Total amount for each item
-* Cancelled/Not Cancelled
+```bash
+dotnet tool install --global dotnet-ef
+```
 
-It's not mandatory, but it would be a differential to build code for publishing events of:
-* SaleCreated
-* SaleModified
-* SaleCancelled
-* ItemCancelled
+### 1. Subir os containers de banco de dados
 
-If you write the code, **it's not required** to actually publish to any Message Broker. You can log a message in the application log or however you find most convenient.
+O arquivo `docker-compose.yml`, na raiz do repositório, provisiona os bancos de dados usados pela API:
 
-### Business Rules
+* **PostgreSQL** (`ambev.developerevaluation.database`) — dados relacionais (Users, Sales, SaleItems)
+* **MongoDB** (`ambev.developerevaluation.nosql`) — log de auditoria dos eventos de domínio das vendas (SaleEvents)
 
-* Purchases above 4 identical items have a 10% discount
-* Purchases between 10 and 20 identical items have a 20% discount
-* It's not possible to sell above 20 identical items
-* Purchases below 4 items cannot have a discount
+A partir da raiz do repositório, execute:
 
-These business rules define quantity-based discounting tiers and limitations:
+```bash
+docker-compose up -d
+```
 
-1. Discount Tiers:
-   - 4+ items: 10% discount
-   - 10-20 items: 20% discount
+Isso inicia o PostgreSQL da porta `5432` para `65224` e o MongoDB da porta `27017` para `65225`, usando as credenciais já configuradas em `src/Ambev.DeveloperEvaluation.WebApi/appsettings.json`.
 
-2. Restrictions:
-   - Maximum limit: 20 items per product
-   - No discounts allowed for quantities below 4 items
+>
+### 2. Aplicar as migrations do banco de dados
 
-## Overview
-This section provides a high-level overview of the project and the various skills and competencies it aims to assess for developer candidates. 
+Com o PostgreSQL em execução, aplique as migrations do EF Core para criar o schema:
 
-See [Overview](/.doc/overview.md)
+```bash
+cd src/Ambev.DeveloperEvaluation.WebApi
+dotnet ef database update --project ../Ambev.DeveloperEvaluation.ORM --startup-project .
+```
 
-## Tech Stack
-This section lists the key technologies used in the project, including the backend, testing, frontend, and database components. 
+Isso cria as tabelas `Users`, `Sales` e `SaleItems`. O MongoDB não precisa de migration — a coleção `SaleEvents` é criada automaticamente na primeira inserção.
 
-See [Tech Stack](/.doc/tech-stack.md)
+Se você alterar uma entidade e precisar criar uma nova migration, execute:
 
-## Frameworks
-This section outlines the frameworks and libraries that are leveraged in the project to enhance development productivity and maintainability. 
+```bash
+cd src/Ambev.DeveloperEvaluation.WebApi
+dotnet ef migrations add <NomeDaMigration> --project ../Ambev.DeveloperEvaluation.ORM --startup-project .
+```
 
-See [Frameworks](/.doc/frameworks.md)
+### 3. Executar a API
 
-<!-- 
-## API Structure
-This section includes links to the detailed documentation for the different API resources:
-- [API General](./docs/general-api.md)
-- [Products API](/.doc/products-api.md)
-- [Carts API](/.doc/carts-api.md)
-- [Users API](/.doc/users-api.md)
-- [Auth API](/.doc/auth-api.md)
--->
+```bash
+cd src/Ambev.DeveloperEvaluation.WebApi
+dotnet run
+```
 
-## Project Structure
-This section describes the overall structure and organization of the project files and directories. 
+A API estará disponível com o Swagger UI habilitado no ambiente de Development.
 
-See [Project Structure](/.doc/project-structure.md)
+### 4. Executar os testes
+
+```bash
+dotnet test
+```
+
+## Front-end
+
+Esta API pode ser integrada ao front-end em Angular disponível no repositório:
+
+[https://github.com/Jorge-argachoff/Mouts-Ambev-FrontEnd.git](https://github.com/Jorge-argachoff/Mouts-Ambev-FrontEnd.git)
+
+Para utilizá-lo, clone o repositório, instale as dependências e execute o projeto:
+
+```bash
+git clone https://github.com/Jorge-argachoff/Mouts-Ambev-FrontEnd.git
+cd Mouts-Ambev-FrontEnd
+npm install
+npm start
+```
+
+O front-end estará disponível em `http://localhost:4200` e já está configurado para consumir esta API em `https://localhost:7181/api`. Certifique-se de que a API esteja em execução (passo 3 acima) antes de utilizá-lo.
